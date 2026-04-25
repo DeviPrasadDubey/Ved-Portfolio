@@ -122,17 +122,19 @@ export function ZAxisHero() {
                 className="absolute inset-0"
                 style={{
                   background:
-                    "linear-gradient(160deg, rgba(201,164,76,0.08) 0%, rgba(8,8,10,0.6) 100%)",
+                    "linear-gradient(180deg, transparent 40%, rgba(8,8,10,0.5) 100%)",
                 }}
+                aria-hidden
               />
               <Image
-                src="/ved-hero-transparent.png"
+                src="/ved-hero.png"
                 alt="Ved Prakash Dwivedi"
                 fill
                 priority
-                style={{ objectFit: "cover", objectPosition: "top center" }}
+                sizes="(max-width: 768px) 45vw, 26rem"
+                style={{ objectFit: "cover", objectPosition: "center top" }}
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/50 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-background/55 via-transparent to-background/20" />
             </div>
           </motion.div>
 
