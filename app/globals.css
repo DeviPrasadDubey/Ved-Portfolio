@@ -1,26 +1,101 @@
 @import "tailwindcss";
 
+@theme {
+  --color-background: #08080a;
+  --color-foreground: #f5f0e8;
+  --color-accent: #c9a44c;
+  --color-muted: #7a7572;
+  --color-card: rgba(255, 255, 255, 0.04);
+
+  --font-sans: var(--font-inter), "Inter", sans-serif;
+  --font-serif: var(--font-playfair), "Playfair Display", serif;
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --cursor-glow: rgba(201, 164, 76, 0.55);
+  /* “Success gold” for Hire-intent on contact (distinct from static accent) */
+  --glow-success-gold: #d4a941;
+  --glow-validate-ok: rgba(201, 164, 76, 0.5);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 72px;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  overflow-x: hidden;
+  cursor: none;
+}
+
+* {
+  cursor: none !important;
+}
+
+/* Glass utility — ui-ux-pro-max "Glass" variant */
+.glass {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(15px);
+  -webkit-backdrop-filter: blur(15px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Neon utility — ui-ux-pro-max "Neon" variant (gold) */
+.neon-gold {
+  box-shadow:
+    0 0 24px rgba(201, 164, 76, 0.18),
+    0 0 60px rgba(201, 164, 76, 0.08);
+}
+
+.neon-gold-focus:focus {
+  outline: none;
+  border-color: rgba(201, 164, 76, 0.45) !important;
+  box-shadow: 0 0 36px rgba(201, 164, 76, 0.3);
+}
+
+/* Real-time form glow — default validation trail */
+.form-live-glow {
+  transition: box-shadow 0.4s ease, border-color 0.35s ease;
+}
+
+.form-live-glow--editing {
+  box-shadow:
+    0 0 0 1px rgba(201, 164, 76, 0.2),
+    0 0 32px rgba(201, 164, 76, 0.12);
+}
+
+/* All required fields + email valid */
+.form-live-glow--valid {
+  box-shadow:
+    0 0 0 1px var(--glow-validate-ok),
+    0 0 48px rgba(201, 164, 76, 0.2),
+    0 0 80px rgba(201, 164, 76, 0.08);
+}
+
+/* User types “Hire” — success gold (brief) */
+.form-live-glow--hire {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--glow-success-gold) 60%, white 10%),
+    0 0 64px color-mix(in srgb, var(--glow-success-gold) 40%, transparent),
+    0 0 120px color-mix(in srgb, var(--glow-success-gold) 25%, transparent);
+}
+
+/* Blueprint grid pattern for Logic section */
+.blueprint-grid {
+  background-image:
+    linear-gradient(rgba(201, 164, 76, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(201, 164, 76, 0.06) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
