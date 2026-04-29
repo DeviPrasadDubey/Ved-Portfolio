@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useState, useCallback, useRef, useEffect } from "react";
 import dynamic from "next/dynamic";
-import { motion, AnimatePresence, useInView } from "framer-motion";
+import { motion, AnimatePresence, useInView, useReducedMotion } from "framer-motion";
 import {
   EXPOSURE_MARKETS,
   PRODUCTION_MARKETS,
@@ -14,6 +14,55 @@ const Globe3D = dynamic(
   () => import("@/components/background/Globe3D").then((m) => ({ default: m.Globe3D })),
   { ssr: false },
 );
+const MARKET_SECTION_IN_VIEW_THRESHOLD = 0.35;
+
+function AnimatedNumericValue({ value }: { value: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduce = useReducedMotion();
+  const [count, setCount] = useState(0);
+
+  const match = value.match(/^(\$?)(\d+(?:\.\d+)?)(.*)$/);
+  const prefix = match?.[1] ?? "";
+  const numberPart = match?.[2];
+  const suffix = match?.[3] ?? "";
+  const parsed = numberPart ? Number(numberPart) : NaN;
+  const decimals = numberPart?.includes(".") ? numberPart.split(".")[1]?.length ?? 0 : 0;
+
+  useEffect(() => {
+    if (!inView || Number.isNaN(parsed)) return;
+    if (reduce) {
+      const frame = requestAnimationFrame(() => setCount(parsed));
+      return () => cancelAnimationFrame(frame);
+    }
+
+    const duration = 2000;
+    const start = performance.now();
+    let rafId = 0;
+
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - (1 - p) ** 3;
+      setCount(parsed * eased);
+      if (p < 1) rafId = requestAnimationFrame(tick);
+    };
+
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [inView, parsed, reduce]);
+
+  if (!match || Number.isNaN(parsed)) {
+    return <span>{value}</span>;
+  }
+
+  return (
+    <span ref={ref}>
+      {prefix}
+      {decimals > 0 ? count.toFixed(decimals) : Math.round(count)}
+      {suffix}
+    </span>
+  );
+}
 
 /* ─── Empty state panel ────────────────────────────────────────────────── */
 function EmptyPanel({ mode }: { mode: Mode }) {
@@ -52,8 +101,21 @@ function EmptyPanel({ mode }: { mode: Mode }) {
 
       <div className="mt-8 grid grid-cols-3 gap-4 border-t border-white/[0.07] pt-6">
         {stats.map(({ val, lbl }) => (
-          <div key={lbl}>
-            <p className="font-serif text-2xl font-bold leading-none text-accent">{val}</p>
+          <div key={lbl} className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2">
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.05) 48%, transparent 78%)",
+              }}
+              animate={{ opacity: [0.22, 0.48, 0.22], scale: [0.98, 1.02, 0.98] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <p className="relative overflow-hidden font-serif text-2xl font-bold leading-none text-accent">
+              <AnimatedNumericValue value={val} />
+            </p>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
             <p className="mt-1.5 text-[7.5px] uppercase tracking-[0.3em] text-muted/36">{lbl}</p>
           </div>
         ))}
@@ -160,14 +222,14 @@ function GlobeFallback() {
 /* ─── Section ──────────────────────────────────────────────────────────── */
 export function MarketExposureSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
-  const sectionInView = useInView(sectionRef, { amount: 0.35 });
+  const sectionInView = useInView(sectionRef, { amount: MARKET_SECTION_IN_VIEW_THRESHOLD });
   const [mode, setMode] = useState<Mode>("exposure");
   const [selectedMarker, setSelectedMarker] = useState<string | null>(null);
   const [isRotating, setIsRotating] = useState(false);
   const [focusTick, setFocusTick] = useState(0);
 
-  const activeMarket = ALL_MARKETS.find((m) => m.id === selectedMarker) ?? null;
-  const currentChips = mode === "exposure" ? EXPOSURE_MARKETS : PRODUCTION_MARKETS;
+  const selectedMarket = ALL_MARKETS.find((market) => market.id === selectedMarker) ?? null;
+  const visibleModeMarkets = mode === "exposure" ? EXPOSURE_MARKETS : PRODUCTION_MARKETS;
 
   const handleCountryFocus = useCallback((id: string) => {
     setSelectedMarker(id);
@@ -206,7 +268,7 @@ export function MarketExposureSection() {
       {/* Background glow */}
       <div
         className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{ width: 900, height: 450, background: "radial-gradient(ellipse, rgba(212,175,55,0.04) 0%, transparent 65%)" }}
+        style={{ width: 900, height: 450, background: "radial-gradient(ellipse, rgba(212,175,55,0.075) 0%, rgba(212,175,55,0.02) 45%, transparent 68%)" }}
       />
 
       <div className="relative mx-auto flex h-full max-w-7xl flex-col px-4 py-6 md:px-6 md:py-12">
@@ -305,21 +367,21 @@ export function MarketExposureSection() {
 
             {/* Chip navigation */}
             <div className="mt-3 grid shrink-0 auto-cols-fr grid-flow-col grid-rows-2 gap-2 pb-1">
-              {currentChips.map((m) => (
+              {visibleModeMarkets.map((market) => (
                 <motion.button
-                  key={m.id}
+                  key={market.id}
                   type="button"
-                  onClick={() => handleCountryFocus(m.id)}
+                  onClick={() => handleCountryFocus(market.id)}
                   layout
-                  className="cursor-pointer border px-3 py-2 text-[9px] uppercase tracking-[0.2em] transition-colors duration-200 md:tracking-[0.28em]"
+                  className="cursor-pointer border px-3 py-2 text-[9px] uppercase tracking-[0.2em] transition-all duration-300 md:tracking-[0.28em] hover:brightness-110 hover:shadow-[0_0_22px_-6px_rgba(212,175,55,0.22)]"
                   style={{
-                    borderColor: selectedMarker === m.id ? `${m.color}60` : "rgba(255,255,255,0.07)",
-                    color: selectedMarker === m.id ? m.color : "rgba(245,245,245,0.42)",
-                    background: selectedMarker === m.id ? `${m.color}0d` : "transparent",
+                    borderColor: selectedMarker === market.id ? `${market.color}60` : "rgba(255,255,255,0.07)",
+                    color: selectedMarker === market.id ? market.color : "rgba(245,245,245,0.42)",
+                    background: selectedMarker === market.id ? `${market.color}0d` : "transparent",
                   }}
                   whileTap={{ scale: 0.96 }}
                 >
-                  {m.label}
+                  {market.label}
                 </motion.button>
               ))}
             </div>
@@ -328,10 +390,10 @@ export function MarketExposureSection() {
           {/* Panel column — 40% width on desktop */}
           <div className="min-h-0 lg:w-[34%] lg:pl-8">
             <AnimatePresence mode="wait">
-              {activeMarket ? (
+              {selectedMarket ? (
                 <MarketPanel
-                  key={activeMarket.id}
-                  market={activeMarket}
+                  key={selectedMarket.id}
+                  market={selectedMarket}
                   onClose={handleResumeRotation}
                 />
               ) : (

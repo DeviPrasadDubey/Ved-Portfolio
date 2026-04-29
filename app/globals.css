@@ -58,7 +58,7 @@ body {
   cursor: none !important;
 }
 
-@media (max-width: 767px) {
+@media (hover: none), (pointer: coarse) {
   body,
   * {
     cursor: auto !important;

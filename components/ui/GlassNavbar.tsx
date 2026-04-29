@@ -3,6 +3,46 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 
+/** Hover: slight zoom + each character shifts color in sequence (word-by-word feel on short labels). */
+function NavAnimatedLabel({ label }: { label: string }) {
+  const chars = label.split("");
+  return (
+    <motion.span
+      className="inline-flex origin-center"
+      initial="rest"
+      whileHover="hover"
+    >
+      {chars.map((ch, i) => (
+        <motion.span
+          key={`${label}-${i}`}
+          className="inline-block"
+          variants={{
+            rest: {
+              color: "rgba(200, 200, 210, 0.52)",
+              scale: 1,
+              y: 0,
+            },
+            hover: {
+              color: "#f5e6b8",
+              scale: 1.14,
+              y: -2,
+              transition: {
+                delay: i * 0.045,
+                duration: 0.32,
+                type: "spring",
+                stiffness: 420,
+                damping: 20,
+              },
+            },
+          }}
+        >
+          {ch === " " ? "\u00A0" : ch}
+        </motion.span>
+      ))}
+    </motion.span>
+  );
+}
+
 const NAV_LINKS = [
   { label: "Story", href: "#gateway" },
   { label: "Impact", href: "#impact" },
@@ -61,9 +101,9 @@ export function GlassNavbar({ visible }: { visible: boolean }) {
             <li key={l.label}>
               <Link
                 href={l.href}
-                className="text-[10px] uppercase tracking-[0.38em] text-muted/55 transition-colors duration-200 hover:text-accent/90"
+                className="inline-block origin-center text-[10px] uppercase tracking-[0.38em] transition-transform duration-200 ease-out hover:scale-110"
               >
-                {l.label}
+                <NavAnimatedLabel label={l.label} />
               </Link>
             </li>
           ))}
@@ -72,9 +112,9 @@ export function GlassNavbar({ visible }: { visible: boolean }) {
               href={RESUME_HREF}
               target="_blank"
               rel="noopener noreferrer"
-              className="border border-accent/30 px-3 py-1.5 text-[10px] uppercase tracking-[0.38em] text-accent/75 transition-colors duration-200 hover:border-accent/65 hover:bg-accent/[0.07] hover:text-accent"
+              className="inline-block origin-center border border-accent/30 px-3 py-1.5 text-[10px] uppercase tracking-[0.38em] text-accent/75 transition-transform duration-200 hover:scale-105 hover:border-accent/65 hover:bg-accent/[0.07]"
             >
-              Resume
+              <NavAnimatedLabel label="Resume" />
             </a>
           </li>
         </ul>
@@ -95,9 +135,9 @@ export function GlassNavbar({ visible }: { visible: boolean }) {
                 <Link
                   href={l.href}
                   onClick={closeMenu}
-                  className="block rounded border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.28em] text-muted/75 transition-colors hover:border-accent/35 hover:text-accent"
+                  className="block origin-center rounded border border-white/10 px-4 py-3 text-xs uppercase tracking-[0.28em] transition-transform hover:scale-[1.03] hover:border-accent/35"
                 >
-                  {l.label}
+                  <NavAnimatedLabel label={l.label} />
                 </Link>
               </li>
             ))}
@@ -107,9 +147,9 @@ export function GlassNavbar({ visible }: { visible: boolean }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={closeMenu}
-                className="block rounded border border-accent/30 px-4 py-3 text-xs uppercase tracking-[0.28em] text-accent/80 transition-colors hover:border-accent/65 hover:bg-accent/[0.07] hover:text-accent"
+                className="block origin-center rounded border border-accent/30 px-4 py-3 text-xs uppercase tracking-[0.28em] text-accent/80 transition-transform hover:scale-[1.02] hover:border-accent/65 hover:bg-accent/[0.07]"
               >
-                Resume
+                <NavAnimatedLabel label="Resume" />
               </a>
             </li>
           </ul>

@@ -59,6 +59,16 @@ export function ContactSection() {
         body: JSON.stringify(form),
       });
 
+      const raw = await res.text();
+      let data: { error?: string; debug?: string } = {};
+      if (raw) {
+        try {
+          data = JSON.parse(raw) as { error?: string; debug?: string };
+        } catch {
+          console.error("[contact form] bad JSON", res.status, raw.slice(0, 300));
+        }
+      }
+
       if (res.ok) {
         setStatus("sent");
         setFeedback("Message sent successfully.");
@@ -66,10 +76,20 @@ export function ContactSection() {
         return;
       }
 
-      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      const detail = typeof data.debug === "string" ? data.debug : "";
+      const badGmailAuth =
+        detail.includes("BadCredentials") || detail.includes("535-5.7.8");
+      if (badGmailAuth) {
+        console.warn(
+          "[contact] Gmail rejected EMAIL_USER / EMAIL_PASS. Use a 16-character App Password (Google Account → Security → 2-Step Verification → App passwords), paste it into EMAIL_PASS in .env.local with no spaces, restart the dev server.",
+        );
+      } else {
+        console.error("[contact form]", res.status, data.error, detail || "");
+      }
       setStatus("error");
       setFeedback(data?.error || "Unable to send message right now. Please try again.");
-    } catch {
+    } catch (err) {
+      console.error("[contact form] fetch failed", err);
       setStatus("error");
       setFeedback("Unable to send message right now. Please try again.");
     }

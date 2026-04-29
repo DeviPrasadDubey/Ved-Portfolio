@@ -8,6 +8,28 @@ import { ALL_MARKETS, type Mode, type MarketEntry } from "@/lib/market-data";
 /* ─── Helpers ──────────────────────────────────────────────────────────── */
 const TEXTURE_LONGITUDE_OFFSET = 90;
 const SHOW_DEBUG_TEST_MARKERS = false;
+const GLOBE_RADIUS = 2.2;
+const MARKER_RADIUS = 2.255;
+const GRID_RADIUS = 2.212;
+const CAMERA_DEFAULT_FOV = 40;
+const CAMERA_FOCUSED_FOV = 28;
+const CAMERA_FOV_LERP = 0.05;
+const CAMERA_DEFAULT_DISTANCE = 8.0;
+const CAMERA_FOCUSED_DISTANCE = 7.35;
+const AUTO_ROTATE_SPEED = 0.1;
+const FOCUS_SLERP_FACTOR = 0.18;
+const MARKER_FRONT_VISIBILITY_THRESHOLD = -0.06;
+const MARKER_OPACITY_LERP = 0.08;
+const MARKER_SCALE_LERP = 0.2;
+const MARKER_SELECTED_SCALE = 1.12;
+const MARKER_HOVER_SCALE = 1.05;
+const STAR_FIELD_POINT_COUNT = 2200;
+const STAR_FIELD_MIN_RADIUS = 50;
+const STAR_FIELD_RADIUS_RANGE = 100;
+const STAR_FIELD_ROTATION_SPEED = 0.002;
+const STARFIELD_SEED = 246813579;
+const FOCUS_UNLOCK_ANGLE = 0.0025;
+const BASE_GLOBE_TILT_X = 0.18;
 const DEBUG_TEST_MARKERS: readonly Pick<MarketEntry, "id" | "label" | "lat" | "lng" | "mode" | "color" | "region" | "brands">[] = [
   {
     id: "debug-india",
@@ -71,16 +93,63 @@ function latLngToVec3(lat: number, lng: number, r: number): THREE.Vector3 {
   );
 }
 
-function calcTargetYawFromVector(
-  markerPos: THREE.Vector3,
-  currentRotY: number,
+function localNorthTangent(lat: number, lng: number): THREE.Vector3 {
+  const delta = 0.2;
+  const p = latLngToVec3(lat, lng, 1).normalize();
+  const pNorth = latLngToVec3(Math.min(lat + delta, 89.9), lng, 1).normalize();
+  return pNorth.sub(p).normalize();
+}
+
+/** Rotate unit vector `markerDir` (local) toward camera so the marker faces the viewer (front hemisphere). */
+function quaternionFacingCamera(
+  markerDir: THREE.Vector3,
   cameraPos: THREE.Vector3,
-): number {
-  const markerYaw = Math.atan2(markerPos.x, markerPos.z);
-  const cameraYaw = Math.atan2(cameraPos.x, cameraPos.z);
-  const desired = cameraYaw - markerYaw;
-  const diff = ((desired - currentRotY) % (Math.PI * 2) + Math.PI * 3) % (Math.PI * 2) - Math.PI;
-  return currentRotY + diff;
+  tiltX: number,
+): THREE.Quaternion {
+  const from = markerDir.clone().normalize();
+  const to = cameraPos.clone().normalize();
+  if (from.dot(to) < -0.999) {
+    from.x += 0.0001;
+    from.normalize();
+  }
+  const qFace = new THREE.Quaternion().setFromUnitVectors(from, to);
+  const qTilt = new THREE.Quaternion().setFromEuler(
+    new THREE.Euler(tiltX, 0, 0, "YXZ"),
+  );
+  return qTilt.clone().multiply(qFace);
+}
+
+/** Focus orientation with north-up alignment at the selected marker point. */
+function quaternionFacingCameraNorthUp(
+  markerDir: THREE.Vector3,
+  localNorth: THREE.Vector3,
+  cameraPos: THREE.Vector3,
+): THREE.Quaternion {
+  const camDir = cameraPos.clone().normalize();
+
+  // 1) Bring selected marker to the front (camera-facing direction).
+  const qFace = new THREE.Quaternion().setFromUnitVectors(
+    markerDir.clone().normalize(),
+    camDir,
+  );
+
+  // 2) Roll around view axis so local north appears up on screen.
+  const up = new THREE.Vector3(0, 1, 0);
+  const n1 = localNorth.clone().applyQuaternion(qFace).normalize();
+  const nProj = n1.clone().projectOnPlane(camDir).normalize();
+  const upProj = up.clone().projectOnPlane(camDir).normalize();
+
+  if (nProj.lengthSq() < 1e-8 || upProj.lengthSq() < 1e-8) {
+    return qFace;
+  }
+
+  const dot = THREE.MathUtils.clamp(nProj.dot(upProj), -1, 1);
+  const angle = Math.acos(dot);
+  const cross = new THREE.Vector3().crossVectors(nProj, upProj);
+  const signed = cross.dot(camDir) >= 0 ? angle : -angle;
+
+  const qRoll = new THREE.Quaternion().setFromAxisAngle(camDir, signed);
+  return qRoll.multiply(qFace);
 }
 
 function seededRandom(seed: number): () => number {
@@ -89,15 +158,6 @@ function seededRandom(seed: number): () => number {
     s = (s * 1664525 + 1013904223) >>> 0;
     return s / 4294967296;
   };
-}
-
-function hashStringToUnit(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return ((hash >>> 0) % 10000) / 10000;
 }
 
 /* ─── Camera FOV zoom on marker focus ─────────────────────────────────── */
@@ -114,8 +174,18 @@ function CameraController({ focused }: { focused: boolean }) {
   useFrame(() => {
     const cam = cameraRef.current;
     if (!cam) return;
-    const tgt = focused ? 30 : 40;
-    cam.fov += (tgt - cam.fov) * 0.05;
+    const targetFov = focused ? CAMERA_FOCUSED_FOV : CAMERA_DEFAULT_FOV;
+    const targetDistance = focused ? CAMERA_FOCUSED_DISTANCE : CAMERA_DEFAULT_DISTANCE;
+    const currentDistance = cam.position.length();
+    if (currentDistance > 0.0001) {
+      const nextDistance = THREE.MathUtils.lerp(
+        currentDistance,
+        targetDistance,
+        CAMERA_FOV_LERP,
+      );
+      cam.position.setLength(nextDistance);
+    }
+    cam.fov += (targetFov - cam.fov) * CAMERA_FOV_LERP;
     cam.updateProjectionMatrix();
   });
   return null;
@@ -147,8 +217,8 @@ function CameraFollowKeyLight() {
   return (
     <directionalLight
       ref={lightRef}
-      intensity={1.28}
-      color="#fff1d2"
+      intensity={1.55}
+      color="#fff4dc"
     />
   );
 }
@@ -158,11 +228,10 @@ function StarField() {
   const ref = useRef<THREE.Points>(null);
 
   const geo = useMemo(() => {
-    const count = 2200;
-    const pos = new Float32Array(count * 3);
-    const rand = seededRandom(246813579);
-    for (let i = 0; i < count; i++) {
-      const r = 50 + rand() * 100;
+    const pos = new Float32Array(STAR_FIELD_POINT_COUNT * 3);
+    const rand = seededRandom(STARFIELD_SEED);
+    for (let i = 0; i < STAR_FIELD_POINT_COUNT; i++) {
+      const r = STAR_FIELD_MIN_RADIUS + rand() * STAR_FIELD_RADIUS_RANGE;
       const theta = rand() * Math.PI * 2;
       const phi = Math.acos(2 * rand() - 1);
       pos[i * 3]     = r * Math.sin(phi) * Math.cos(theta);
@@ -174,11 +243,13 @@ function StarField() {
     return g;
   }, []);
 
-  useFrame((_, d) => { if (ref.current) ref.current.rotation.y += d * 0.002; });
+  useFrame((_, deltaTime) => {
+    if (ref.current) ref.current.rotation.y += deltaTime * STAR_FIELD_ROTATION_SPEED;
+  });
 
   return (
     <points ref={ref} geometry={geo}>
-      <pointsMaterial size={0.35} color="#c8d8f0" transparent opacity={0.55} sizeAttenuation />
+      <pointsMaterial size={0.42} color="#d8e6ff" transparent opacity={0.68} sizeAttenuation />
     </points>
   );
 }
@@ -202,8 +273,9 @@ function GlobeCore() {
         disposables.push(tex);
         if (!matRef.current) return;
         matRef.current.map = tex;
-        matRef.current.color.set(0xffffff);   // show texture at full fidelity
-        matRef.current.emissiveIntensity = 0;
+        matRef.current.color.set(0xffffff);
+        matRef.current.emissive = new THREE.Color(0x2a1810);
+        matRef.current.emissiveIntensity = 0.09;
         matRef.current.needsUpdate = true;
       },
       undefined,
@@ -217,7 +289,8 @@ function GlobeCore() {
             if (!matRef.current) return;
             matRef.current.map = tex;
             matRef.current.color.set(0xffffff);
-            matRef.current.emissiveIntensity = 0;
+            matRef.current.emissive = new THREE.Color(0x2a1810);
+            matRef.current.emissiveIntensity = 0.09;
             matRef.current.needsUpdate = true;
           },
         );
@@ -246,7 +319,7 @@ function GlobeCore() {
 
   return (
     <mesh>
-      <sphereGeometry args={[2.2, 80, 80]} />
+      <sphereGeometry args={[GLOBE_RADIUS, 80, 80]} />
       {/* Placeholder shown while textures load; replaced once map is set */}
       <meshPhongMaterial
         ref={matRef}
@@ -262,13 +335,13 @@ function GlobeCore() {
 
 /* ─── Subtle gold lat/lng navigation grid ──────────────────────────────── */
 function GlobeGrid() {
-  const R = 2.212;
+  const gridRadius = GRID_RADIUS;
   const primitives = useMemo(() => {
     const out: { obj: THREE.Object3D; key: string }[] = [];
 
     [-60, -30, 0, 30, 60].forEach((lat) => {
-      const y = R * Math.sin((lat * Math.PI) / 180);
-      const r = R * Math.cos((lat * Math.PI) / 180);
+      const y = gridRadius * Math.sin((lat * Math.PI) / 180);
+      const r = gridRadius * Math.cos((lat * Math.PI) / 180);
       const pts: THREE.Vector3[] = [];
       for (let i = 0; i <= 96; i++) {
         const a = (i / 96) * Math.PI * 2;
@@ -278,7 +351,7 @@ function GlobeGrid() {
       const mat = new THREE.LineBasicMaterial({
         color: "#D4AF37",
         transparent: true,
-        opacity: lat === 0 ? 0.12 : 0.045,
+        opacity: lat === 0 ? 0.2 : 0.065,
       });
       out.push({ obj: new THREE.Line(geo, mat), key: `lat${lat}` });
     });
@@ -289,22 +362,22 @@ function GlobeGrid() {
       for (let i = 0; i <= 64; i++) {
         const phi2 = (i / 64) * Math.PI;
         pts.push(new THREE.Vector3(
-          R * Math.sin(phi2) * Math.cos(theta),
-          R * Math.cos(phi2),
-          R * Math.sin(phi2) * Math.sin(theta),
+          gridRadius * Math.sin(phi2) * Math.cos(theta),
+          gridRadius * Math.cos(phi2),
+          gridRadius * Math.sin(phi2) * Math.sin(theta),
         ));
       }
       const geo2 = new THREE.BufferGeometry().setFromPoints(pts);
       const mat2 = new THREE.LineBasicMaterial({
         color: "#D4AF37",
         transparent: true,
-        opacity: 0.028,
+        opacity: 0.045,
       });
       out.push({ obj: new THREE.Line(geo2, mat2), key: `lng${lng}` });
     }
 
     return out;
-  }, []);
+  }, [gridRadius]);
 
   return (
     <>
@@ -329,26 +402,22 @@ function Marker({
 }) {
   const groupRef = useRef<THREE.Group>(null);
   const coreRef = useRef<THREE.Mesh>(null);
-  const pulse1Ref = useRef<THREE.Mesh>(null);
   const haloRef = useRef<THREE.Mesh>(null);
   const [isHovered, setIsHovered] = useState(false);
   const { camera } = useThree();
 
-  const BASE_R = 2.255;
-  const basePos = useMemo(() => latLngToVec3(market.lat, market.lng, BASE_R), [market.lat, market.lng]);
+  const markerPosition = useMemo(
+    () => latLngToVec3(market.lat, market.lng, MARKER_RADIUS),
+    [market.lat, market.lng],
+  );
   const col = useMemo(() => new THREE.Color(color), [color]);
 
   const opacity = useRef(0);
   const targetOp = useRef(1);
-  const ph1 = useRef(0);
   const tmpPos = useMemo(() => new THREE.Vector3(), []);
   const tmpToCamera = useMemo(() => new THREE.Vector3(), []);
 
-  useEffect(() => {
-    ph1.current = hashStringToUnit(market.id);
-  }, [market.id]);
-
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (!groupRef.current) return;
 
     groupRef.current.getWorldPosition(tmpPos);
@@ -356,38 +425,31 @@ function Marker({
     const normalWorld = tmpPos.clone().normalize();
     const facing = normalWorld.dot(tmpToCamera); // > 0 means marker on front hemisphere
     const frontFactor = THREE.MathUtils.clamp((facing + 0.1) / 1.1, 0, 1);
-    groupRef.current.visible = facing > -0.18;
+    groupRef.current.visible = facing > MARKER_FRONT_VISIBILITY_THRESHOLD;
 
-    opacity.current += ((targetOp.current * frontFactor) - opacity.current) * 0.08;
-    groupRef.current.position.copy(basePos);
-    const targetScale = isSelected ? 1.26 : isHovered ? 1.12 : 1;
+    opacity.current += ((targetOp.current * frontFactor) - opacity.current) * MARKER_OPACITY_LERP;
+    groupRef.current.position.copy(markerPosition);
+    const targetScale = isSelected ? MARKER_SELECTED_SCALE : isHovered ? MARKER_HOVER_SCALE : 1;
     groupRef.current.scale.lerp(
       new THREE.Vector3(targetScale, targetScale, targetScale),
-      0.2,
+      MARKER_SCALE_LERP,
     );
 
     if (coreRef.current) {
-      (coreRef.current.material as THREE.MeshBasicMaterial).opacity = opacity.current * (isSelected ? 1 : 0.9);
+      (coreRef.current.material as THREE.MeshBasicMaterial).opacity = opacity.current * (isSelected ? 1 : 0.85);
     }
 
     if (haloRef.current) {
-      const mat = haloRef.current.material as THREE.MeshBasicMaterial;
-      const pulse = 0.5 + Math.sin(performance.now() * 0.006) * 0.5;
-      mat.opacity = opacity.current * (isSelected ? 0.62 : 0.35) * (0.7 + pulse * 0.5);
-      haloRef.current.scale.setScalar(isSelected ? 2.4 + pulse * 0.9 : 1.8 + pulse * 0.55);
-    }
-
-    if (pulse1Ref.current) {
-      const spd = isSelected ? 0.75 : 0.55;
-      ph1.current = (ph1.current + dt * spd) % 1;
-      const maxScale = isSelected ? 6.4 : 4.8;
-      pulse1Ref.current.scale.setScalar(1 + ph1.current * maxScale);
-      (pulse1Ref.current.material as THREE.MeshBasicMaterial).opacity =
-        opacity.current * (1 - ph1.current) * (isSelected ? 0.68 : 0.48);
+      const blink = 0.5 + Math.sin(performance.now() * 0.0065) * 0.5;
+      const pulseScale = isSelected ? 1.3 + blink * 0.22 : 1.12 + blink * 0.16;
+      haloRef.current.scale.setScalar(pulseScale);
+      (haloRef.current.material as THREE.MeshBasicMaterial).opacity =
+        opacity.current * (isSelected ? 0.55 : 0.36) * (0.55 + blink * 0.45);
     }
   });
 
-  const cR = isSelected ? 0.034 : 0.027;
+  const markerDotRadius = isSelected ? 0.056 : 0.046;
+  const clickRadius = markerDotRadius * 2.35;
 
   return (
     <group
@@ -402,24 +464,24 @@ function Marker({
         onClick();
       }}
     >
+      <mesh>
+        <sphereGeometry args={[clickRadius, 10, 10]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
       <mesh ref={coreRef}>
-        <sphereGeometry args={[cR, 14, 14]} />
-        <meshBasicMaterial color={col} transparent opacity={0.92} depthWrite={false} />
+        <sphereGeometry args={[markerDotRadius, 14, 14]} />
+        <meshBasicMaterial color={col} transparent opacity={0.95} depthWrite={false} />
       </mesh>
 
       <mesh ref={haloRef}>
-        <sphereGeometry args={[cR * 2, 14, 14]} />
-        <meshBasicMaterial color={col} transparent opacity={0.35} depthWrite={false} />
-      </mesh>
-
-      <mesh ref={pulse1Ref}>
-        <ringGeometry args={[cR * 1.8, cR * 2.35, 24]} />
+        <sphereGeometry args={[markerDotRadius * 1.9, 14, 14]} />
         <meshBasicMaterial
           color={col}
           transparent
-          opacity={0.45}
-          side={THREE.DoubleSide}
+          opacity={0.42}
           depthWrite={false}
+          blending={THREE.AdditiveBlending}
         />
       </mesh>
 
@@ -431,7 +493,7 @@ function Marker({
               background: "rgba(8,8,12,0.92)",
               borderColor: `${color}66`,
               color: "#f7f7f7",
-              boxShadow: `0 0 24px ${color}55`,
+              boxShadow: `0 0 36px ${color}88, 0 0 12px ${color}66`,
               transform: "translateY(-24px)",
               whiteSpace: "nowrap",
             }}
@@ -458,36 +520,31 @@ function GlobeGroup({
   const { camera } = useThree();
   const groupRef = useRef<THREE.Group>(null);
   const rotY = useRef(0.4);
-  const rotX = useRef(0.18);
-  const baseTiltX = useRef(0.18);
-  const targetRotY = useRef<number | null>(null);
-  const targetRotX = useRef<number | null>(null);
+  const rotX = useRef(BASE_GLOBE_TILT_X);
+  const baseTiltX = useRef(BASE_GLOBE_TILT_X);
   const targetQuat = useRef(new THREE.Quaternion());
   const isLocked = useRef(false);
   const selectedIdRef = useRef(selectedId);
-  const rotatingRef = useRef(isRotating);
 
-  useEffect(() => { selectedIdRef.current = selectedId; }, [selectedId]);
-  useEffect(() => { rotatingRef.current = isRotating; }, [isRotating]);
+  useEffect(() => {
+    selectedIdRef.current = selectedId;
+  }, [selectedId]);
 
   useEffect(() => {
     if (selectedId) {
       const m = ALL_MARKETS.find((x) => x.id === selectedId);
       if (m) {
-        const markerPos = latLngToVec3(m.lat, m.lng, 1);
-        targetRotY.current = calcTargetYawFromVector(markerPos, rotY.current, camera.position);
-        targetRotX.current = baseTiltX.current;
-        targetQuat.current.setFromEuler(
-          new THREE.Euler(targetRotX.current, targetRotY.current, 0, "YXZ"),
+        const markerDir = latLngToVec3(m.lat, m.lng, 1).normalize();
+        const north = localNorthTangent(m.lat, m.lng);
+        targetQuat.current.copy(
+          quaternionFacingCameraNorthUp(markerDir, north, camera.position),
         );
         isLocked.current = true;
       }
     } else {
       isLocked.current = false;
-      targetRotY.current = null;
-      targetRotX.current = null;
     }
-  }, [selectedId, focusTick, camera.position.x, camera.position.z, camera.position]);
+  }, [selectedId, focusTick, camera.position.x, camera.position.y, camera.position.z, camera.position]);
 
   useEffect(() => {
     const activeMarkets = ALL_MARKETS.filter((m) => m.mode === mode);
@@ -504,29 +561,27 @@ function GlobeGroup({
 
     const targetLat = mean.lat / activeMarkets.length;
     const targetLng = mean.lng / activeMarkets.length;
-    const markerPos = latLngToVec3(targetLat, targetLng, 1);
-    targetRotY.current = calcTargetYawFromVector(markerPos, rotY.current, camera.position);
-    targetRotX.current = baseTiltX.current;
-    targetQuat.current.setFromEuler(
-      new THREE.Euler(targetRotX.current, targetRotY.current, 0, "YXZ"),
+    const markerDir = latLngToVec3(targetLat, targetLng, 1).normalize();
+    targetQuat.current.copy(
+      quaternionFacingCamera(markerDir, camera.position, baseTiltX.current),
     );
     isLocked.current = true;
-  }, [mode, sectionVisible, camera.position.x, camera.position.z, camera.position]);
+  }, [mode, sectionVisible, camera.position.x, camera.position.y, camera.position.z, camera.position]);
 
   useFrame((state, dt) => {
     if (!groupRef.current) return;
     if (isLocked.current) {
-      groupRef.current.quaternion.slerp(targetQuat.current, 0.18);
+      groupRef.current.quaternion.slerp(targetQuat.current, FOCUS_SLERP_FACTOR);
       const euler = new THREE.Euler().setFromQuaternion(groupRef.current.quaternion, "YXZ");
       rotY.current = euler.y;
       rotX.current = euler.x;
-      if (groupRef.current.quaternion.angleTo(targetQuat.current) < 0.0025) {
+      if (groupRef.current.quaternion.angleTo(targetQuat.current) < FOCUS_UNLOCK_ANGLE) {
         isLocked.current = false;
         groupRef.current.quaternion.copy(targetQuat.current);
       }
-    } else if (rotatingRef.current) {
+    } else if (isRotating) {
       const t = state.clock.elapsedTime;
-      rotY.current += dt * 0.1;
+      rotY.current += dt * AUTO_ROTATE_SPEED;
       rotX.current += (baseTiltX.current + Math.sin(t * 0.75) * 0.16 - rotX.current) * 0.045;
       const rotZ = Math.sin(t * 0.42) * 0.045;
       groupRef.current.quaternion.setFromEuler(
@@ -541,7 +596,7 @@ function GlobeGroup({
     }
     return ALL_MARKETS.filter((m) => m.mode === mode);
   }, [mode]);
-  const markerColor = mode === "production" ? "#ff3b1f" : "#ff5a1f";
+  const markerColor = mode === "exposure" ? "#ff3b1f" : "#2d6bff";
 
   return (
     <group ref={groupRef}>
@@ -564,24 +619,26 @@ function GlobeGroup({
 function Atmosphere() {
   return (
     <>
-      {/* Inner blue atmosphere — creates rim glow at Earth's edge */}
       <mesh>
         <sphereGeometry args={[2.34, 64, 64]} />
         <meshPhongMaterial
-          color={new THREE.Color("#3a6fff")}
+          color={new THREE.Color("#4a7aff")}
           transparent
-          opacity={0.10}
+          opacity={0.16}
           side={THREE.BackSide}
+          emissive={new THREE.Color("#1a3066")}
+          emissiveIntensity={0.35}
         />
       </mesh>
-      {/* Outer diffuse haze */}
       <mesh>
         <sphereGeometry args={[2.52, 64, 64]} />
         <meshPhongMaterial
-          color={new THREE.Color("#1a44cc")}
+          color={new THREE.Color("#2244cc")}
           transparent
-          opacity={0.035}
+          opacity={0.055}
           side={THREE.BackSide}
+          emissive={new THREE.Color("#0a1538")}
+          emissiveIntensity={0.25}
         />
       </mesh>
     </>
@@ -610,7 +667,7 @@ export function Globe3D({
 }: Globe3DProps) {
   return (
     <Canvas
-      camera={{ position: [0, 0, 8.0], fov: 40 }}
+      camera={{ position: [0, 0, CAMERA_DEFAULT_DISTANCE], fov: CAMERA_DEFAULT_FOV }}
       dpr={[1, 1.5]}
       gl={{ antialias: true, alpha: true }}
       style={{ width: "100%", height: "100%" }}
@@ -625,15 +682,17 @@ export function Globe3D({
         - Front soft fill → prevent the facing side from being completely dark
         - Cool blue back-fill → subtle night-side lift
       */}
-      <ambientLight intensity={0.42} color="#f0f4ff" />
+      <ambientLight intensity={0.52} color="#eef2ff" />
       <hemisphereLight
-        intensity={0.48}
-        color="#e8f0ff"
-        groundColor="#10141f"
+        intensity={0.58}
+        color="#f2f6ff"
+        groundColor="#0c1018"
       />
       <CameraFollowKeyLight />
-      <pointLight position={[-4, -2, -4]} intensity={0.14} color="#4a67c9" />
-      <pointLight position={[0, 0, -6]} intensity={0.08} color="#3e5ba8" />
+      <directionalLight position={[-6, 4, 2]} intensity={0.35} color="#ffd9a8" />
+      <pointLight position={[5.5, 1.5, 6.5]} intensity={0.26} color="#ffccaa" distance={28} decay={2} />
+      <pointLight position={[-4, -2, -4]} intensity={0.2} color="#5a78d8" />
+      <pointLight position={[0, 0, -6]} intensity={0.12} color="#4a62a8" />
 
       <StarField />
       <Atmosphere />

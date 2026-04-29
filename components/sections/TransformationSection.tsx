@@ -1,6 +1,6 @@
 "use client";
-import { useRef } from "react";
-import { motion, useScroll, useTransform, useInView } from "framer-motion";
+import { useEffect, useRef, useState } from "react";
+import { motion, useReducedMotion, useScroll, useTransform, useInView } from "framer-motion";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
 const ERAS = [
@@ -87,6 +87,52 @@ const ERAS = [
   },
 ] as const;
 
+function AnimatedHighlightValue({ value }: { value: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduce = useReducedMotion();
+  const [count, setCount] = useState(0);
+
+  // Single-number strings animate (e.g., "$200M+"), complex ranges keep original format.
+  const match = value.match(/^(\$?)(\d+(?:\.\d+)?)(.*)$/);
+  const prefix = match?.[1] ?? "";
+  const numberPart = match?.[2];
+  const suffix = match?.[3] ?? "";
+  const parsed = numberPart ? Number(numberPart) : NaN;
+  const decimals = numberPart?.includes(".") ? numberPart.split(".")[1]?.length ?? 0 : 0;
+
+  useEffect(() => {
+    if (!inView || Number.isNaN(parsed)) return;
+    if (reduce) {
+      const frame = requestAnimationFrame(() => setCount(parsed));
+      return () => cancelAnimationFrame(frame);
+    }
+    const duration = 2000;
+    const start = performance.now();
+    let rafId = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - (1 - p) ** 3;
+      setCount(parsed * eased);
+      if (p < 1) rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [inView, parsed, reduce]);
+
+  if (!match || Number.isNaN(parsed)) {
+    return <span ref={ref}>{value}</span>;
+  }
+
+  return (
+    <span ref={ref}>
+      {prefix}
+      {decimals > 0 ? count.toFixed(decimals) : Math.round(count)}
+      {suffix}
+    </span>
+  );
+}
+
 function EraCard({
   era,
 }: {
@@ -134,13 +180,24 @@ function EraCard({
           </p>
         </div>
         {"highlight" in era && era.highlight && (
-          <div className="mt-3 shrink-0 border border-accent/30 bg-accent/8 px-4 py-2 text-center md:mt-0">
-            <p className="font-serif text-3xl font-black text-accent">
-              {era.highlight}
+          <div className="relative mt-3 shrink-0 overflow-hidden border border-zinc-500/35 bg-black/45 px-4 py-2 text-center md:mt-0">
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background:
+                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.22), rgba(212,175,55,0.06) 48%, transparent 80%)",
+              }}
+              animate={{ opacity: [0.24, 0.5, 0.24], scale: [0.98, 1.02, 0.98] }}
+              transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <p className="relative overflow-hidden font-serif text-3xl font-black text-accent">
+              <AnimatedHighlightValue value={era.highlight} />
             </p>
             <p className="mt-0.5 text-[8px] uppercase tracking-[0.25em] text-muted/55">
               {era.highlightLabel}
             </p>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/45 to-transparent" />
           </div>
         )}
       </div>

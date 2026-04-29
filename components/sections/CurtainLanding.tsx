@@ -132,8 +132,14 @@ export function CurtainLanding({ onLift }: Props) {
       {/* headline */}
       <div className="relative text-center">
         <motion.p
-          className="select-none font-serif font-black text-accent"
-          style={{ fontSize: "clamp(2.6rem, 7.5vw, 6.5rem)", letterSpacing: "-0.025em", lineHeight: 1 }}
+          className="select-none font-serif font-black"
+          style={{
+            fontSize: "clamp(2.6rem, 7.5vw, 6.5rem)",
+            letterSpacing: "-0.025em",
+            lineHeight: 1,
+            color: "#f2cc62",
+            textShadow: "0 0 36px rgba(242,204,98,0.4), 0 0 12px rgba(242,204,98,0.28)",
+          }}
           initial={{ opacity: 0, y: 28 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.22, duration: 0.85, ease: [0.16, 1, 0.3, 1] }}
@@ -164,15 +170,35 @@ export function CurtainLanding({ onLift }: Props) {
       <motion.button
         type="button"
         onClick={lift}
-        className="group relative mt-12 overflow-hidden border border-accent/35 px-10 py-3.5 transition-colors duration-300 hover:border-accent/70"
+        className="group relative mt-12 overflow-hidden border border-accent/35 px-10 py-3.5"
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.85, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.97 }}
       >
-        <span className="absolute inset-0 -translate-x-full bg-accent/[0.09] transition-transform duration-500 group-hover:translate-x-0" aria-hidden />
-        <span className="relative text-[11px] uppercase tracking-[0.55em] text-accent/80 transition-colors duration-300 group-hover:text-accent">
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{
+            background:
+              "linear-gradient(115deg, rgba(212,175,55,0.08) 0%, rgba(212,175,55,0.22) 45%, rgba(212,175,55,0.08) 100%)",
+          }}
+          animate={{ x: ["-20%", "20%", "-20%"], opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2"
+          style={{
+            background:
+              "linear-gradient(100deg, rgba(0,0,0,0) 0%, rgba(0,0,0,0.18) 26%, rgba(255,255,255,0.28) 50%, rgba(0,0,0,0.16) 74%, rgba(0,0,0,0) 100%)",
+            mixBlendMode: "screen",
+          }}
+          animate={{ x: ["-110%", "320%"] }}
+          transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut", repeatDelay: 0.35 }}
+        />
+        <span className="relative text-[11px] uppercase tracking-[0.55em] text-accent/82">
           Enter Portfolio
         </span>
       </motion.button>

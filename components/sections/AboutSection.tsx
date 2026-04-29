@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useInView, useReducedMotion } from "framer-motion";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
 /* ─── Carousel data ───────────────────────────────────────────────────── */
@@ -36,6 +36,49 @@ const POS: {
 
 const CARD_W = 420;
 const CARD_H = 370;
+
+function AnimatedMetricValue({ value }: { value: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const reduce = useReducedMotion();
+  const [count, setCount] = useState(0);
+
+  const match = value.match(/^(\$?)(\d+(?:\.\d+)?)(.*)$/);
+  const prefix = match?.[1] ?? "";
+  const numberPart = match?.[2];
+  const suffix = match?.[3] ?? "";
+  const parsed = numberPart ? Number(numberPart) : NaN;
+  const decimals = numberPart?.includes(".") ? numberPart.split(".")[1]?.length ?? 0 : 0;
+
+  useEffect(() => {
+    if (!inView || Number.isNaN(parsed)) return;
+    if (reduce) {
+      const frame = requestAnimationFrame(() => setCount(parsed));
+      return () => cancelAnimationFrame(frame);
+    }
+    const duration = 2000;
+    const start = performance.now();
+    let rafId = 0;
+    const tick = (now: number) => {
+      const p = Math.min((now - start) / duration, 1);
+      const eased = 1 - (1 - p) ** 3;
+      setCount(parsed * eased);
+      if (p < 1) rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(rafId);
+  }, [inView, parsed, reduce]);
+
+  if (!match || Number.isNaN(parsed)) return <span>{value}</span>;
+
+  return (
+    <span ref={ref}>
+      {prefix}
+      {decimals > 0 ? count.toFixed(decimals) : Math.round(count)}
+      {suffix}
+    </span>
+  );
+}
 
 function relativePos(i: number, center: number): number {
   let d = (i - center + N) % N;
@@ -288,15 +331,26 @@ export function AboutSection() {
             ].map(({ value, label }, idx) => (
               <div
                 key={label}
-                className="pr-4"
+                className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2 pr-4"
                 style={{
-                  borderLeft: idx > 0 ? "1px solid rgba(255,255,255,0.07)" : "none",
+                  borderLeft: idx > 0 ? "1px solid rgba(113,113,122,0.35)" : "none",
                   paddingLeft: idx > 0 ? 16 : 0,
                 }}
               >
-                <p className="font-serif text-[1.35rem] font-bold text-accent leading-none">
-                  {value}
+                <p className="relative overflow-hidden font-serif text-[1.35rem] font-bold text-accent leading-none">
+                  <AnimatedMetricValue value={value} />
                 </p>
+                <motion.div
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0"
+                  style={{
+                    background:
+                      "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.05) 48%, transparent 78%)",
+                  }}
+                  animate={{ opacity: [0.22, 0.46, 0.22], scale: [0.98, 1.02, 0.98] }}
+                  transition={{ duration: 2.9, repeat: Infinity, ease: "easeInOut", delay: idx * 0.12 }}
+                />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
                 <p className="mt-1.5 text-[7.5px] uppercase tracking-[0.3em] text-muted/40">
                   {label}
                 </p>

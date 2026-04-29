@@ -8,12 +8,14 @@ function Counter({
   target,
   prefix = "",
   suffix = "",
-  duration = 1800,
+  duration = 2000,
+  decimals = 0,
 }: {
   target: number;
   prefix?: string;
   suffix?: string;
   duration?: number;
+  decimals?: number;
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once: true, amount: 0.5 });
@@ -30,7 +32,7 @@ function Counter({
     const tick = () => {
       const p = Math.min((Date.now() - start) / duration, 1);
       const eased = 1 - (1 - p) ** 3;
-      setCount(Math.round(target * eased));
+      setCount(target * eased);
       if (p < 1) requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
@@ -38,7 +40,9 @@ function Counter({
 
   return (
     <span ref={ref}>
-      {prefix}{count}{suffix}
+      {prefix}
+      {decimals > 0 ? count.toFixed(decimals) : Math.round(count)}
+      {suffix}
     </span>
   );
 }
@@ -46,38 +50,87 @@ function Counter({
 /* ─── Defect rate drop visual ─────────────────────────────────────────── */
 function DropBar() {
   const ref = useRef<HTMLDivElement>(null);
-  const inView = useInView(ref, { once: true, amount: 0.5 });
+  const inView = useInView(ref, { once: true, amount: 0.35 });
   const reduce = useReducedMotion();
+
+  const beforeH = 120;
+  const afterH = 72;
 
   return (
     <div ref={ref} className="mx-auto max-w-sm">
       <div className="mb-5 flex items-end justify-center gap-4 md:gap-8">
         {/* Before bar */}
         <div className="flex flex-col items-center gap-2">
-          <p className="font-serif text-3xl font-black text-muted/60 md:text-4xl">18%</p>
-          <motion.div
-            className="w-12 rounded-sm md:w-16"
-            style={{ background: "rgba(212,175,55,0.25)" }}
-            initial={{ height: 0 }}
-            animate={inView ? { height: reduce ? 120 : 120 } : { height: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
-          />
+          <p className="relative overflow-hidden font-serif text-3xl font-black text-muted/60 md:text-4xl">
+            <Counter target={18} suffix="%" duration={2000} />
+          </p>
+          <div className="flex h-[128px] w-12 flex-col justify-end md:w-16">
+            <motion.div
+              className="relative w-full overflow-hidden rounded-sm"
+              style={{ background: "rgba(212,175,55,0.28)" }}
+              initial={{ height: 0 }}
+              animate={inView ? { height: reduce ? beforeH : beforeH } : { height: 0 }}
+              transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.2 }}
+            />
+          </div>
           <p className="text-[9px] uppercase tracking-[0.35em] text-muted/45">Before · Returns</p>
         </div>
 
         {/* Arrow */}
         <div className="mb-6 pb-2 text-2xl text-accent/40">→</div>
 
-        {/* After bar */}
+        {/* After bar — fixed chart height so 7.8% column + glow stays visible */}
         <div className="flex flex-col items-center gap-2">
-          <p className="font-serif text-3xl font-black text-accent md:text-4xl">7.8%</p>
-          <motion.div
-            className="w-12 rounded-sm bg-accent/70 md:w-16"
-            initial={{ height: 0 }}
-            animate={inView ? { height: reduce ? 52 : 52 } : { height: 0 }}
-            transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1], delay: 0.5 }}
-          />
-          <p className="text-[9px] uppercase tracking-[0.35em] text-muted/45">After · Strategically Reduced</p>
+          <p
+            className="relative overflow-hidden font-serif text-3xl font-black md:text-4xl"
+            style={{
+              color: "#D4AF37",
+              textShadow:
+                "0 0 28px rgba(212,175,55,0.55), 0 0 12px rgba(255,230,160,0.35)",
+            }}
+          >
+            <Counter target={7.8} suffix="%" duration={2000} decimals={1} />
+          </p>
+          <div className="relative flex h-[128px] w-12 flex-col justify-end md:w-16">
+            <motion.div
+              aria-hidden
+              className="pointer-events-none absolute bottom-0 left-1/2 z-0 w-[130%] max-w-[5.5rem] -translate-x-1/2 rounded-full"
+              style={{
+                height: afterH + 28,
+                background: "rgba(212,175,55,0.5)",
+                filter: "blur(18px)",
+              }}
+              initial={{ opacity: 0 }}
+              animate={
+                inView
+                  ? { opacity: [0.35, 0.75, 0.35] }
+                  : { opacity: 0 }
+              }
+              transition={{
+                duration: 2.2,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: 0.5,
+              }}
+            />
+            <motion.div
+              className="relative z-[1] w-full overflow-hidden rounded-sm border border-accent/55 shadow-[0_0_26px_rgba(212,175,55,0.5),inset_0_1px_0_rgba(255,248,220,0.4)]"
+              style={{
+                background:
+                  "linear-gradient(to top, #7a6218 0%, #D4AF37 35%, #f2e4a8 70%, #fffcef 100%)",
+              }}
+              initial={{ height: 0, opacity: 0.5 }}
+              animate={
+                inView
+                  ? { height: reduce ? afterH : afterH, opacity: 1 }
+                  : { height: 0, opacity: 0.5 }
+              }
+              transition={{ duration: 0.85, ease: [0.16, 1, 0.3, 1], delay: 0.45 }}
+            />
+          </div>
+          <p className="text-[9px] uppercase tracking-[0.35em] text-accent/75">
+            After · Strategically Reduced
+          </p>
         </div>
       </div>
 
@@ -142,19 +195,35 @@ export function ImpactSection() {
         <div className="mb-10 h-px bg-gradient-to-r from-transparent via-accent/18 to-transparent md:mb-16" />
 
         {/* metric counters grid */}
-        <div className="grid grid-cols-2 gap-px border border-white/[0.06] bg-white/[0.06] md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-px border border-zinc-600/35 bg-black/35 md:grid-cols-4">
           {METRICS.map((m, i) => (
             <motion.div
               key={m.label}
-              className="bg-background/95 px-4 py-5 md:px-6 md:py-6"
+              className="relative overflow-hidden border border-zinc-500/35 bg-black/45 px-4 py-5 md:px-6 md:py-6"
               initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: i * 0.07 }}
             >
-              <p className="font-serif text-3xl font-bold text-accent">
-                <Counter prefix={m.prefix} target={m.target} suffix={m.suffix} />
+              <motion.div
+                aria-hidden
+                className="pointer-events-none absolute inset-0"
+                style={{
+                  background:
+                    "radial-gradient(120% 90% at 50% 18%, rgba(212,175,55,0.22), rgba(212,175,55,0.06) 48%, transparent 80%)",
+                }}
+                animate={{ opacity: [0.24, 0.5, 0.24], scale: [0.98, 1.02, 0.98] }}
+                transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}
+              />
+              <p className="relative overflow-hidden font-serif text-3xl font-bold text-accent">
+                <Counter
+                  prefix={m.prefix}
+                  target={m.target}
+                  suffix={m.suffix}
+                  duration={2000}
+                />
               </p>
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
               <p className="mt-1 text-[10px] uppercase tracking-[0.3em] text-foreground/75">
                 {m.label}
               </p>

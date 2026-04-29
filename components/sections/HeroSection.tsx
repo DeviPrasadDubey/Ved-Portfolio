@@ -66,10 +66,26 @@ function StatCounter({ target, prefix = "", suffix = "", label, startDelay = 0, 
     return () => clearTimeout(timer);
   }, [ready, target, startDelay, reduce]);
   return (
-    <div>
-      <p className="font-serif text-2xl font-bold text-accent">{prefix}{count}{suffix}</p>
+    <motion.div
+      className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2"
+      initial={{ opacity: 0.75 }}
+      animate={ready ? { opacity: [0.9, 1, 0.9] } : { opacity: 0.75 }}
+      transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
+    >
+      <motion.div
+        aria-hidden
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.06) 45%, transparent 75%)",
+        }}
+        animate={ready ? { opacity: [0.25, 0.5, 0.25], scale: [0.98, 1.02, 0.98] } : { opacity: 0.2 }}
+        transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: startDelay }}
+      />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/45 to-transparent" />
+      <p className="relative font-serif text-2xl font-bold text-accent">{prefix}{count}{suffix}</p>
       <p className="mt-0.5 text-[8px] uppercase tracking-[0.22em] text-muted/45">{label}</p>
-    </div>
+    </motion.div>
   );
 }
 
@@ -183,12 +199,12 @@ export function HeroSection({ curtainLifted }: { curtainLifted: boolean }) {
               <CharReveal text="Ved Prakash" baseDelay={0.48} charStagger={0.042} className="text-foreground/95" ready={ready} />
             </span>
             <span className="relative block" style={{ isolation: "isolate" }}>
-              <CharReveal text="Dwivedi" baseDelay={0.68} charStagger={0.05} className="text-accent" ready={ready} />
+              <CharReveal text="Dwivedi" baseDelay={0.68} charStagger={0.05} className="text-[#f2cc62]" ready={ready} />
               <motion.span
                 aria-hidden
                 className="pointer-events-none absolute inset-0"
                 style={{
-                  background: "linear-gradient(90deg, transparent 15%, rgba(212,175,55,0.55) 50%, transparent 85%)",
+                  background: "linear-gradient(90deg, transparent 15%, rgba(242,204,98,0.62) 50%, transparent 85%)",
                   mixBlendMode: "screen",
                 }}
                 initial={{ x: "-110%", opacity: 0 }}
