@@ -97,11 +97,37 @@ function latLngToVec3(lat: number, lng: number, r: number): THREE.Vector3 {
 /** Dominant highlighted side as a single front-facing direction vector. */
 function getDenseClusterDirection(markets: MarketEntry[]): THREE.Vector3 | null {
   if (!markets.length) return null;
-  const sum = new THREE.Vector3(0, 0, 0);
-  for (const m of markets) {
-    sum.add(latLngToVec3(m.lat, m.lng, 1).normalize());
+  const dirs = markets.map((m) => latLngToVec3(m.lat, m.lng, 1).normalize());
+  if (dirs.length === 1) return dirs[0].clone();
+
+  // Choose the hemisphere containing the most highlighted markets.
+  let bestCenter = dirs[0].clone();
+  let bestCount = -1;
+  let bestScore = -Infinity;
+
+  for (const c of dirs) {
+    let count = 0;
+    let score = 0;
+    for (const d of dirs) {
+      const dot = c.dot(d);
+      if (dot > 0) {
+        count++;
+        score += dot;
+      }
+    }
+    if (count > bestCount || (count === bestCount && score > bestScore)) {
+      bestCount = count;
+      bestScore = score;
+      bestCenter = c.clone();
+    }
   }
-  if (sum.lengthSq() < 1e-8) return null;
+
+  // Average only vectors from that winning hemisphere for stable front-facing direction.
+  const sum = new THREE.Vector3(0, 0, 0);
+  for (const d of dirs) {
+    if (bestCenter.dot(d) > 0) sum.add(d);
+  }
+  if (sum.lengthSq() < 1e-8) return bestCenter.normalize();
   return sum.normalize();
 }
 
