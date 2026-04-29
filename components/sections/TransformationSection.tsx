@@ -180,13 +180,13 @@ function EraCard({
           </p>
         </div>
         {"highlight" in era && era.highlight && (
-          <div className="relative mt-3 shrink-0 overflow-hidden border border-zinc-500/35 bg-black/45 px-4 py-2 text-center md:mt-0">
+          <div className="relative mt-3 shrink-0 overflow-hidden border border-zinc-500/35 bg-accent/5 px-4 py-2 text-center md:mt-0">
             <motion.div
               aria-hidden
               className="pointer-events-none absolute inset-0"
               style={{
                 background:
-                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.22), rgba(212,175,55,0.06) 48%, transparent 80%)",
+                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.12), rgba(212,175,55,0.03) 48%, transparent 80%)",
               }}
               animate={{ opacity: [0.24, 0.5, 0.24], scale: [0.98, 1.02, 0.98] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}

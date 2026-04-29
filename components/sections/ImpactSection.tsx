@@ -195,11 +195,11 @@ export function ImpactSection() {
         <div className="mb-10 h-px bg-gradient-to-r from-transparent via-accent/18 to-transparent md:mb-16" />
 
         {/* metric counters grid */}
-        <div className="grid grid-cols-2 gap-px border border-zinc-600/35 bg-black/35 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-px border border-zinc-600/35 bg-accent/4 md:grid-cols-4">
           {METRICS.map((m, i) => (
             <motion.div
               key={m.label}
-              className="relative overflow-hidden border border-zinc-500/35 bg-black/45 px-4 py-5 md:px-6 md:py-6"
+              className="relative overflow-hidden border border-zinc-500/35 bg-accent/5 px-4 py-5 md:px-6 md:py-6"
               initial={{ opacity: 0, y: 14 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -210,7 +210,7 @@ export function ImpactSection() {
                 className="pointer-events-none absolute inset-0"
                 style={{
                   background:
-                    "radial-gradient(120% 90% at 50% 18%, rgba(212,175,55,0.22), rgba(212,175,55,0.06) 48%, transparent 80%)",
+                    "radial-gradient(120% 90% at 50% 18%, rgba(212,175,55,0.12), rgba(212,175,55,0.03) 48%, transparent 80%)",
                 }}
                 animate={{ opacity: [0.24, 0.5, 0.24], scale: [0.98, 1.02, 0.98] }}
                 transition={{ duration: 2.7, repeat: Infinity, ease: "easeInOut", delay: i * 0.1 }}

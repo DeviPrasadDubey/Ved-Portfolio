@@ -17,6 +17,7 @@ const CAMERA_FOV_LERP = 0.05;
 const CAMERA_DEFAULT_DISTANCE = 8.0;
 const CAMERA_FOCUSED_DISTANCE = 7.35;
 const AUTO_ROTATE_SPEED = 0.1;
+const AUTO_ROTATE_SPEED_VISIBLE = 0.055;
 const FOCUS_SLERP_FACTOR = 0.18;
 const MARKER_FRONT_VISIBILITY_THRESHOLD = -0.06;
 const MARKER_OPACITY_LERP = 0.08;
@@ -91,6 +92,17 @@ function latLngToVec3(lat: number, lng: number, r: number): THREE.Vector3 {
     r * Math.sin(latRad),
     r * Math.cos(latRad) * Math.cos(lngRad),
   );
+}
+
+/** Dominant highlighted side as a single front-facing direction vector. */
+function getDenseClusterDirection(markets: MarketEntry[]): THREE.Vector3 | null {
+  if (!markets.length) return null;
+  const sum = new THREE.Vector3(0, 0, 0);
+  for (const m of markets) {
+    sum.add(latLngToVec3(m.lat, m.lng, 1).normalize());
+  }
+  if (sum.lengthSq() < 1e-8) return null;
+  return sum.normalize();
 }
 
 function localNorthTangent(lat: number, lng: number): THREE.Vector3 {
@@ -549,21 +561,10 @@ function GlobeGroup({
   useEffect(() => {
     const activeMarkets = ALL_MARKETS.filter((m) => m.mode === mode);
     if (!activeMarkets.length || selectedIdRef.current || !sectionVisible) return;
-
-    const mean = activeMarkets.reduce(
-      (acc, m) => {
-        acc.lat += m.lat;
-        acc.lng += m.lng;
-        return acc;
-      },
-      { lat: 0, lng: 0 },
-    );
-
-    const targetLat = mean.lat / activeMarkets.length;
-    const targetLng = mean.lng / activeMarkets.length;
-    const markerDir = latLngToVec3(targetLat, targetLng, 1).normalize();
+    const clusterDir = getDenseClusterDirection(activeMarkets);
+    if (!clusterDir) return;
     targetQuat.current.copy(
-      quaternionFacingCamera(markerDir, camera.position, baseTiltX.current),
+      quaternionFacingCamera(clusterDir, camera.position, baseTiltX.current),
     );
     isLocked.current = true;
   }, [mode, sectionVisible, camera.position.x, camera.position.y, camera.position.z, camera.position]);
@@ -581,7 +582,8 @@ function GlobeGroup({
       }
     } else if (isRotating) {
       const t = state.clock.elapsedTime;
-      rotY.current += dt * AUTO_ROTATE_SPEED;
+      const speed = sectionVisible ? AUTO_ROTATE_SPEED_VISIBLE : AUTO_ROTATE_SPEED;
+      rotY.current += dt * speed;
       rotX.current += (baseTiltX.current + Math.sin(t * 0.75) * 0.16 - rotX.current) * 0.045;
       const rotZ = Math.sin(t * 0.42) * 0.045;
       groupRef.current.quaternion.setFromEuler(

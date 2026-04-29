@@ -88,14 +88,23 @@ function relativePos(i: number, center: number): number {
 
 /* ─── 3D Coverflow ───────────────────────────────────────────────────── */
 function Coverflow() {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isVisible = useInView(containerRef, { amount: 0.45 });
   const [center, setCenter] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
   const reduce = useReducedMotion();
 
   useEffect(() => {
+    if (!isVisible || reduce) return;
     const t = setInterval(() => setCenter((p) => (p + 1) % N), 3500);
     return () => clearInterval(t);
-  }, []);
+  }, [isVisible, reduce]);
+
+  useEffect(() => {
+    if (!isVisible) return;
+    const frame = requestAnimationFrame(() => setCenter(0));
+    return () => cancelAnimationFrame(frame);
+  }, [isVisible]);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
@@ -120,7 +129,7 @@ function Coverflow() {
     : POS;
 
   return (
-    <div className="flex flex-col items-center gap-5 select-none">
+    <div ref={containerRef} className="flex flex-col items-center gap-5 select-none">
       <div
         className="relative overflow-visible"
         style={{ width: cardW, height: cardH + 38, perspective: 1000, maxWidth: "100%" }}
@@ -331,10 +340,9 @@ export function AboutSection() {
             ].map(({ value, label }, idx) => (
               <div
                 key={label}
-                className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2 pr-4"
+                className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-accent/5 px-3 py-2 text-center"
                 style={{
                   borderLeft: idx > 0 ? "1px solid rgba(113,113,122,0.35)" : "none",
-                  paddingLeft: idx > 0 ? 16 : 0,
                 }}
               >
                 <p className="relative overflow-hidden font-serif text-[1.35rem] font-bold text-accent leading-none">
@@ -345,7 +353,7 @@ export function AboutSection() {
                   className="pointer-events-none absolute inset-0"
                   style={{
                     background:
-                      "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.05) 48%, transparent 78%)",
+                      "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.12), rgba(212,175,55,0.03) 48%, transparent 78%)",
                   }}
                   animate={{ opacity: [0.22, 0.46, 0.22], scale: [0.98, 1.02, 0.98] }}
                   transition={{ duration: 2.9, repeat: Infinity, ease: "easeInOut", delay: idx * 0.12 }}

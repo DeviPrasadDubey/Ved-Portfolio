@@ -67,7 +67,7 @@ function StatCounter({ target, prefix = "", suffix = "", label, startDelay = 0, 
   }, [ready, target, startDelay, reduce]);
   return (
     <motion.div
-      className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2"
+      className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-accent/5 px-3 py-2"
       initial={{ opacity: 0.75 }}
       animate={ready ? { opacity: [0.9, 1, 0.9] } : { opacity: 0.75 }}
       transition={{ duration: 2.6, repeat: Infinity, ease: "easeInOut" }}
@@ -77,7 +77,7 @@ function StatCounter({ target, prefix = "", suffix = "", label, startDelay = 0, 
         className="pointer-events-none absolute inset-0"
         style={{
           background:
-            "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.06) 45%, transparent 75%)",
+            "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.12), rgba(212,175,55,0.03) 45%, transparent 75%)",
         }}
         animate={ready ? { opacity: [0.25, 0.5, 0.25], scale: [0.98, 1.02, 0.98] } : { opacity: 0.2 }}
         transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut", delay: startDelay }}

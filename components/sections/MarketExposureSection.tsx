@@ -101,13 +101,13 @@ function EmptyPanel({ mode }: { mode: Mode }) {
 
       <div className="mt-8 grid grid-cols-3 gap-4 border-t border-white/[0.07] pt-6">
         {stats.map(({ val, lbl }) => (
-          <div key={lbl} className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-black/45 px-3 py-2">
+          <div key={lbl} className="relative overflow-hidden rounded-sm border border-zinc-500/35 bg-accent/5 px-3 py-2">
             <motion.div
               aria-hidden
               className="pointer-events-none absolute inset-0"
               style={{
                 background:
-                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.2), rgba(212,175,55,0.05) 48%, transparent 78%)",
+                  "radial-gradient(120% 90% at 50% 20%, rgba(212,175,55,0.12), rgba(212,175,55,0.03) 48%, transparent 78%)",
               }}
               animate={{ opacity: [0.22, 0.48, 0.22], scale: [0.98, 1.02, 0.98] }}
               transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
