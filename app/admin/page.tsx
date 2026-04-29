@@ -71,7 +71,7 @@ export default function AdminPage() {
 
   if (!unlocked) {
     return (
-      <main className="relative z-10 flex min-h-screen items-center justify-center px-6">
+      <main className="relative z-10 flex min-h-screen items-center justify-center bg-background px-6">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -89,7 +89,7 @@ export default function AdminPage() {
           </p>
           <form
             onSubmit={unlock}
-            className="grid gap-4 overflow-hidden rounded-2xl border border-white/[0.1] bg-gradient-to-b from-white/[0.07] to-white/[0.02] p-8 shadow-[0_0_0_1px_rgba(201,164,76,0.12),0_30px_80px_-20px_rgba(0,0,0,0.55)]"
+            className="admin-glass-surface grid gap-4 overflow-hidden rounded-2xl p-8"
           >
             <label
               htmlFor="pwd"
@@ -126,7 +126,7 @@ export default function AdminPage() {
   }
 
   return (
-    <main className="relative z-10 min-h-screen px-4 pb-20 pt-24 md:px-6">
+    <main className="relative z-10 min-h-screen bg-background px-4 pb-20 pt-24 md:px-6">
       <div className="mx-auto max-w-6xl">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>

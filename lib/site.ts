@@ -1,6 +1,6 @@
 export const navLinks = [
-  { label: "Story", href: "/#story" },
-  { label: "Impact", href: "/#impact" },
+  { label: "Story", href: "/#transformation" },
+  { label: "Impact", href: "/#global-standard" },
   { label: "Fit", href: "/#fit" },
   { label: "Expertise", href: "/#expertise" },
   { label: "Blogs", href: "/blogs" },

@@ -1,0 +1,10 @@
+
+          {/* 2D animated sub-heading */}
+          <h3 className="mb-9 font-serif text-[1.85rem] font-semibold md:text-[2.2rem]">
+            <RevealLine className="text-foreground/95">
+              Built on Grit.
+            </RevealLine>
+            <RevealLine delay={0.1} className="text-accent">
+              Led by People.
+            </RevealLine>
+          </h3>
