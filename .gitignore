@@ -1,31 +1,60 @@
-# dependencies
+# =========================
+# Dependencies
+# =========================
 node_modules
 
-# env files (VERY IMPORTANT)
+# =========================
+# Environment variables (VERY IMPORTANT)
+# =========================
 .env
 .env.local
-.env*.local
+.env.*.local
 .env.production
+.env.development
 
-# next build
+# =========================
+# Next.js build output
+# =========================
 .next
 out
+.vercel
 
-# typescript
+# =========================
+# TypeScript
+# =========================
 tsconfig.tsbuildinfo
 
-# logs
+# =========================
+# Logs
+# =========================
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+pnpm-debug.log*
 
-# system files
+# =========================
+# System files
+# =========================
 .DS_Store
 Thumbs.db
 
-# editor / ai tools (IMPORTANT)
+# =========================
+# Editor / IDE
+# =========================
+.vscode
+.idea
+
+# =========================
+# AI / Tooling configs
+# =========================
 .cursor
 .claude
 .mcp.json
 .opencode.json
 .windsurfrules
+.cursorrules
+
+# =========================
+# Misc
+# =========================
+*.log
